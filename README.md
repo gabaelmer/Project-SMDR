@@ -2,148 +2,89 @@
 
 [![Build and Release](https://github.com/gabaelmer/Project-SMDR/actions/workflows/build.yml/badge.svg)](https://github.com/gabaelmer/Project-SMDR/actions/workflows/build.yml)
 
-Modern cross-platform desktop application for MiVoice Business SMDR collection and analytics.
+**SMDR Insight** is a modern, high-stability SMDR (Station Message Detail Recording) collector and analytics platform designed for MiVoice Business systems. It provides real-time call tracking, advanced security alerts, and a beautiful web-based dashboard for network-wide monitoring.
 
-## Stack
+---
 
-- Backend: Node.js + TypeScript
-- Desktop shell: Electron
-- Frontend: React + TailwindCSS
-- State: Zustand
-- Storage: SQLite (`better-sqlite3`)
-- Charts: Recharts
-- Grid: TanStack Table
-- TCP client: Node `net` module
-- Packaging: Electron Builder
+## 🌟 Key Features
 
-## Project Structure
+- **High-Stability TCP Client**: Persistent connection to MiVB SMDR streams (port `1752`) with custom "Quiet Period" handling for low-volume systems.
+- **Headless Server Mode**: Optimized background service running on pure Node.js—no display hardware (X Server) required.
+- **Modern Web Interface**: Beautiful dashboard accessible from any device on your network.
+- **Real-time Analytics**: Live call log, volume heatmaps, extension usage, and correlation analytics.
+- **Robust Alert Engine**: instant detection of long calls, watch numbers, repeated busy calls, and toll-denied events.
+- **Secure by Design**: Role-based access, session persistence, and optional field-level encryption for PII.
+- **Automated Deployment**: One-liner installer for Debian/Ubuntu with full systemd integration.
 
-```text
-/main      Electron main process + IPC
-/renderer  React app (dashboard, call log, analytics, settings)
-/backend   TCP client, parser, DB, alerts, analytics
-/shared    Shared TypeScript types
-/tests     Unit + integration tests
-/scripts   Load/memory/failover simulations
-```
+---
 
-## Features Implemented
+## 🚀 Installation (Ubuntu/Debian)
 
-- TCP client to MiVB SMDR stream on port `1752`
-- Auto reconnect (`5s` default)
-- Multi-controller failover and primary failback probe
-- Parser for SMDR line records with dynamic option detection:
-  - External/Internal records
-  - Call IDs, associated IDs, sequence IDs
-  - Network OLI
-  - Extended digits
-  - Account codes
-  - Completion flags and transfer/conference flags
-- SQLite storage with indices and optional field encryption
-- Daily rollover archive (`CSV`) + retention purge
-- Export to CSV / Excel (`.xlsx`)
-- Dashboard metrics, call log table, analytics charts/heatmap/correlation
-- Alert engine:
-  - Long call threshold
-  - Watch numbers
-  - Repeated busy calls
-  - Tag call detection
-  - Toll denied detection
-- Local login/auth bootstrap (`admin` / `admin123!` on first run)
-- Desktop notifications for alert events
-- Test suite and simulators
-
-## Installation
-
-### Ubuntu/Debian One-Liner
-
-Install the latest version directly from GitHub:
+Deploy SMDR Insight as a background service with a single command:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gabaelmer/Project-SMDR/main/install.sh | sudo bash
 ```
 
-### Local Development Setup
+After installation, the app is instantly available at:
+`http://your-server-ip:3000`
+
+> [!TIP]
+> **First Login**: Use `admin` / `admin123!` to bootstrap your first session.
+
+---
+
+## 🛠️ Technical Stack
+
+- **Runtime**: Node.js 20+ (Service) / Electron (Desktop Client)
+- **Language**: TypeScript
+- **Database**: SQLite (`better-sqlite3`) with daily rollover
+- **Frontend**: React 18, TailwindCSS, Zustand
+- **Real-time**: Server-Sent Events (SSE)
+- **Charts**: Recharts
+- **Service**: systemd (Linux)
+
+---
+
+## 💻 Service Management
+
+Manage your collector directly from the terminal:
 
 ```bash
-# 1. Clone the repo
+# Check status
+sudo systemctl status smdr-insight
+
+# View real-time logs (Data stream & Web Access)
+sudo journalctl -u smdr-insight -f
+
+# Restart service
+sudo systemctl restart smdr-insight
+```
+
+---
+
+## 🏗️ Development
+
+### Setup
+```bash
 git clone https://github.com/gabaelmer/Project-SMDR.git
 cd Project-SMDR
-
-# 2. Install dependencies
 npm install
+npm run build
 ```
 
-Or use the integrated launcher:
+### Run Commands
+- `npm run dev`: Launch the desktop application (Dev Mode)
+- `npm run serve:node`: Run the pure Node server locally
+- `npm run dist`: Build Linux packages (`.deb`, `AppImage`, `.tar.gz`)
 
-```bash
-./run-smdr-insight.sh setup
-```
+---
 
-## Run Dev
+## 📝 Troubleshooting
 
-```bash
-npm run dev
-```
+- **Web Access**: Ensure port `3000` is open in your server firewall (`sudo ufw allow 3000`).
+- **SQLITE_CANTOPEN**: Usually a permission issue. Re-run `install.sh` to reset directory ownership.
+- **Connection Drops**: Check `journalctl` for network-level TCP errors. SMDR Insight uses TCP Keep-Alives to maintain stability.
 
-Integrated launcher (recommended):
-
-```bash
-./run-smdr-insight.sh dev
-```
-
-If you see `better-sqlite3 ... NODE_MODULE_VERSION ...` mismatch errors, run:
-
-```bash
-npm run rebuild:native
-```
-
-After login, configure MiVoice Business in `Settings`:
-- `MiVoice Business Controller IPs (comma separated)`
-- `Port` (default `1752`)
-- Click `Save Configuration`, then `Start Stream`
-
-## Build Linux Packages
-
-```bash
-npm run dist
-```
-
-Integrated launcher:
-
-```bash
-./run-smdr-insight.sh dist
-```
-
-Targets:
-
-- AppImage
-- deb
-- tar.gz
-
-Publisher/maintainer metadata: `elmertech.work`
-
-## Test Commands
-
-```bash
-npm test
-npm run simulate:stream
-npm run simulate:failover
-npm run test:load
-npm run test:memory
-npm run test:all
-```
-
-Integrated test/debug sequence:
-
-```bash
-./run-smdr-insight.sh test
-```
-
-## Notes
-
-- MiVB limits SMDR sessions to max 10 concurrent connections. Configuration enforces `1-10`.
-- This implementation uses field-level encryption for sensitive values when `storage.encryptionKey` is set.
-- Parser is resilient for variable-length lines and ignores malformed records with separate parse-error logging.
-- Designed to run on Ubuntu Server/Desktop, Debian, and other Linux distributions that support Electron runtime dependencies.
-- Linux VM note: `npm run dev` uses `--no-sandbox --disable-setuid-sandbox` for Electron dev startup to avoid the `chrome-sandbox` SUID error in restricted environments.
+---
+*Maintained by the elmertech team.*
