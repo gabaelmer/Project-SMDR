@@ -1,16 +1,13 @@
 #!/bin/bash
 
-# SMDR Insight - Production Node Installer
+# SMDR Insight - High-Stability Node Installer
 # Clones, builds, and sets up as a pure Node.js background service.
 
 set -e
 
 REPO_URL="https://github.com/gabaelmer/Project-SMDR.git"
 INSTALL_DIR="/opt/smdr-insight"
-SERVICE_USER=$USER
-if [ "$SERVICE_USER" == "root" ]; then
-    SERVICE_USER="elmer"
-fi
+SERVICE_USER="elmer" # Explicitly set preferred service user
 
 echo "--- SMDR Insight High-Stability Installer ---"
 
@@ -30,13 +27,13 @@ fi
 echo "[3/6] Setting up installation directory..."
 if [ -d "$INSTALL_DIR" ]; then
     echo "Updating existing installation at $INSTALL_DIR..."
-    sudo chown -R $USER:$USER $INSTALL_DIR
+    sudo chown -R $SERVICE_USER:$SERVICE_USER $INSTALL_DIR
     cd $INSTALL_DIR
-    git pull
+    sudo -u $SERVICE_USER git pull
 else
     sudo mkdir -p $INSTALL_DIR
-    sudo chown -R $USER:$USER $INSTALL_DIR
-    git clone $REPO_URL $INSTALL_DIR
+    sudo chown -R $SERVICE_USER:$SERVICE_USER $INSTALL_DIR
+    sudo -u $SERVICE_USER git clone $REPO_URL $INSTALL_DIR
     cd $INSTALL_DIR
 fi
 
@@ -44,19 +41,17 @@ fi
 echo "[4/6] Building project for system Node..."
 # Kill existing process to unlock files
 sudo systemctl stop smdr-insight || true
-rm -rf node_modules dist # Clean start
 
-npm install
-npm run build
+sudo -u $SERVICE_USER npm install
+sudo -u $SERVICE_USER npm run build
 
 echo "Rebuilding native modules for $(node -v)..."
-npm rebuild better-sqlite3
+sudo -u $SERVICE_USER npm rebuild better-sqlite3
 
 # 5. Systemd Service Integration
 echo "[5/6] Configuring systemd service..."
 SERVICE_FILE="/etc/systemd/system/smdr-insight.service"
 NODE_PATH=$(which node)
-TSX_PATH=$(which npx) # We'll use node to run the compiled JS directly for stability
 
 cat <<EOF | sudo tee $SERVICE_FILE
 [Unit]
