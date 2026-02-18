@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f4f8ff;
+  --surface: #ffffff;
+  --surface-alt: #edf4ff;
+  --text: #10203d;
+  --muted: #5f6e88;
+  --border: #d7e1f2;
+}
+
+.dark {
+  --bg: #050b1a;
+  --surface: #0d1730;
+  --surface-alt: #101f3f;
+  --text: #e9f1ff;
+  --muted: #a9b9d8;
+  --border: #22345e;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: Manrope, 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(37, 137, 235, 0.18), transparent 30%),
+    radial-gradient(circle at 90% 90%, rgba(49, 188, 146, 0.14), transparent 28%),
+    var(--bg);
+  color: var(--text);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: 0 8px 30px rgba(8, 20, 45, 0.12);
+}
+
+.fade-up {
+  animation: fadeUp 350ms ease-out;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+release/
+*.sqlite
+*.log
+startup_debug.txt
+build_debug.txt
+test_output.txt
+.env
+.local_node_env
+*.zip
+*.deb
+*.AppImage
+*.tar.gz
