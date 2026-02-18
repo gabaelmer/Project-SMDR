@@ -130,7 +130,29 @@ export class WebServer {
     }
 
     private setupStatic(): void {
-        const rendererPath = path.join(__dirname, '../../../renderer');
+        // Try multiple locations for the renderer assets
+        const pathsToTry = [
+            path.join(__dirname, '../../../renderer'), // Production (dist/main/backend/web -> dist/renderer)
+            path.join(process.cwd(), 'dist/renderer'),  // From root dist folder
+            path.join(__dirname, '../../../../renderer'), // Alternative deep production
+        ];
+
+        let rendererPath = '';
+        for (const p of pathsToTry) {
+            if (fs.existsSync(p) && fs.existsSync(path.join(p, 'index.html'))) {
+                rendererPath = p;
+                break;
+            }
+        }
+
+        if (!rendererPath) {
+            console.error('[Web] FATAL: Could not find renderer assets in any of:', pathsToTry);
+            // Fallback to first one anyway to avoid crash, but error is logged
+            rendererPath = pathsToTry[0];
+        } else {
+            console.log(`[Web] Serving static files from: ${rendererPath}`);
+        }
+
         this.app.use(express.static(rendererPath));
 
         // For SPA routing
@@ -140,7 +162,7 @@ export class WebServer {
                 if (fs.existsSync(indexFile)) {
                     res.sendFile(indexFile);
                 } else {
-                    res.status(404).send('Renderer not found. Please run build or check paths.');
+                    res.status(404).send(`Renderer not found at ${indexFile}. Please run build.`);
                 }
             } else {
                 res.status(404).json({ error: 'API endpoint not found' });
@@ -156,11 +178,8 @@ export class WebServer {
 
     private toCsv(records: SMDRRecord[]): string {
         if (records.length === 0) return '';
-
-        // Use identical logic to DatabaseService for parity
         const headers = Object.keys(records[0]) as Array<keyof SMDRRecord>;
         const lines = [headers.join(',')];
-
         for (const record of records) {
             const row = headers.map((header) => {
                 const value = String(record[header] ?? '');
@@ -171,7 +190,6 @@ export class WebServer {
             });
             lines.push(row.join(','));
         }
-
         return `${lines.join('\n')}\n`;
     }
 }

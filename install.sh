@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# SMDR Insight - Build-from-Source Installer
-# This script clones the repo, builds the project, and sets up a systemd service.
+# SMDR Insight - Pure Node Installer
+# This script clones the repo, builds the project, and sets up a pure Node.js systemd service.
 
 set -e
 
@@ -52,16 +52,17 @@ SERVICE_FILE="/etc/systemd/system/smdr-insight.service"
 
 cat <<EOF | sudo tee $SERVICE_FILE
 [Unit]
-Description=SMDR Insight Logger Service
+Description=SMDR Insight Logger Service (Node)
 After=network.target
 
 [Service]
 Type=simple
 User=$SERVICE_USER
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$(which npm) run serve:headless
+ExecStart=$(which npm) run serve:node
 Restart=always
 Environment=NODE_ENV=production
+# No DISPLAY environment needed for pure Node mode
 
 [Install]
 WantedBy=multi-user.target
@@ -71,10 +72,10 @@ EOF
 echo "Starting SMDR Insight service..."
 sudo systemctl daemon-reload
 sudo systemctl enable smdr-insight
-sudo systemctl start smdr-insight
+sudo systemctl restart smdr-insight # Use restart to ensure fresh start
 
 echo "--------------------------------------------------"
 echo "SMDR Insight installed successfully!"
 echo "Service status: $(sudo systemctl is-active smdr-insight)"
-echo "Web Interface: http://localhost:3000"
+echo "Web Interface: http://$(hostname -I | awk '{print $1}'):3000"
 echo "--------------------------------------------------"

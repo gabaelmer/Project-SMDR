@@ -20,6 +20,7 @@
     "build:renderer": "vite build --config renderer/vite.config.ts",
     "build:main": "tsc -p main/tsconfig.json",
     "serve:headless": "npm run build && electron . --headless",
+    "serve:node": "npm run build && node --import tsx main/node-server.ts",
     "dist": "npm run build && electron-builder --linux",
     "test": "vitest run",
     "test:watch": "vitest",
