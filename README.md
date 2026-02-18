@@ -10,11 +10,12 @@
 
 - **High-Stability TCP Client**: Persistent connection to MiVB SMDR streams (port `1752`) with custom "Quiet Period" handling for low-volume systems.
 - **Headless Server Mode**: Optimized background service running on pure Node.js—no display hardware (X Server) required.
-- **Modern Web Interface**: Beautiful dashboard accessible from any device on your network.
+- **Modern Web Interface**: Beautiful dashboard accessible from any device on your network, with persistent sessions across page refreshes.
 - **Real-time Analytics**: Live call log, volume heatmaps, extension usage, and correlation analytics.
-- **Robust Alert Engine**: instant detection of long calls, watch numbers, repeated busy calls, and toll-denied events.
+- **Robust Alert Engine**: Instant detection of long calls, watch numbers, repeated busy calls, and toll-denied events.
+- **Persistent Configuration**: Settings (including Mitel IP addresses) are saved instantly to the server and survive service restarts.
 - **Secure by Design**: Role-based access, session persistence, and optional field-level encryption for PII.
-- **Automated Deployment**: One-liner installer for Debian/Ubuntu with full systemd integration.
+- **Universal Installer**: One-liner installer for Debian/Ubuntu that works for any user account or root, with full systemd integration.
 
 ---
 
@@ -25,6 +26,13 @@ Deploy SMDR Insight as a background service with a single command:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gabaelmer/Project-SMDR/main/install.sh | sudo bash
 ```
+
+The installer will:
+1. Detect your user account automatically (or run as root)
+2. Install all system dependencies (Node.js 20, build tools)
+3. Clone and build the project natively on your server
+4. Rebuild native modules for your specific Node.js version
+5. Configure and start a managed systemd service
 
 After installation, the app is instantly available at:
 `http://your-server-ip:3000`
@@ -82,9 +90,14 @@ npm run build
 
 ## 📝 Troubleshooting
 
-- **Web Access**: Ensure port `3000` is open in your server firewall (`sudo ufw allow 3000`).
-- **SQLITE_CANTOPEN**: Usually a permission issue. Re-run `install.sh` to reset directory ownership.
-- **Connection Drops**: Check `journalctl` for network-level TCP errors. SMDR Insight uses TCP Keep-Alives to maintain stability.
+| Issue | Solution |
+|---|---|
+| Web UI not accessible | Open port 3000: `sudo ufw allow 3000/tcp` |
+| `SQLITE_CANTOPEN` error | Permission issue — re-run `install.sh` to reset ownership |
+| Settings not saving | Check write permissions on `/opt/smdr-insight/config/` |
+| Logged out on refresh | Re-run installer to apply latest session persistence fix |
+| Connection drops | Check `journalctl` for TCP errors; verify PBX is reachable on port 1752 |
+| Port 3000 conflict | Another service is using port 3000 — stop it or change the port in `WebServer.ts` |
 
 ---
 *Maintained by the elmertech team.*
