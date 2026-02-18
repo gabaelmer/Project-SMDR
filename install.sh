@@ -45,7 +45,6 @@ cd $INSTALL_DIR
 echo "Installing dependencies and building project..."
 sudo -u $SERVICE_USER npm install
 sudo -u $SERVICE_USER npm run build
-sudo -u $SERVICE_USER npm run rebuild:native
 
 # 5. Setup Systemd Service
 echo "Configuring systemd service..."
