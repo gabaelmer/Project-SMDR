@@ -47,6 +47,16 @@ if (!fs.existsSync(dbDir)) {
 const service = new SMDRService(config);
 console.log('[NodeServer] SMDRService initialized');
 
+// Persistence logic: Save config when it changes
+service.on('config-change', (updatedConfig: AppConfig) => {
+    try {
+        fs.writeFileSync(configPath, JSON.stringify(updatedConfig, null, 2), 'utf8');
+        console.log('[NodeServer] Configuration persisted to disco:', configPath);
+    } catch (err) {
+        console.error('[NodeServer] Failed to persist configuration:', err);
+    }
+});
+
 const webServer = new WebServer(service);
 webServer.start();
 console.log('[NodeServer] Web Server started on port 3000');

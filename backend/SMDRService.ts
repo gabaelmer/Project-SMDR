@@ -80,11 +80,13 @@ export class SMDRService extends EventEmitter {
     this.config = next;
     this.connection.updateConfig(next.connection);
     this.alerts.updateRules(next.alerts);
+    this.emit('config-change', next);
   }
 
   updateAlertRules(rules: AlertRuleSet): void {
     this.config.alerts = rules;
     this.alerts.updateRules(rules);
+    this.emit('config-change', this.config);
   }
 
   getConfig(): AppConfig {

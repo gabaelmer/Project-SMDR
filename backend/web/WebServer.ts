@@ -52,6 +52,24 @@ export class WebServer {
             res.json(this.service.getConfig());
         });
 
+        this.app.post('/api/config/update', (req, res) => {
+            try {
+                this.service.updateConfig(req.body);
+                res.json({ success: true });
+            } catch (err: any) {
+                res.status(500).json({ success: false, error: err.message });
+            }
+        });
+
+        this.app.post('/api/alerts/update-rules', (req, res) => {
+            try {
+                this.service.updateAlertRules(req.body);
+                res.json({ success: true });
+            } catch (err: any) {
+                res.status(500).json({ success: false, error: err.message });
+            }
+        });
+
         this.app.get('/api/state', (req, res) => {
             res.json(this.service.getState());
         });
