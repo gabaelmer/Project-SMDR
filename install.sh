@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SMDR Insight - Pure Node Installer
+# SMDR Insight - Robust Node Installer
 # This script clones the repo, builds the project, and sets up a pure Node.js systemd service.
 
 set -e
@@ -9,7 +9,7 @@ REPO_URL="https://github.com/gabaelmer/Project-SMDR.git"
 INSTALL_DIR="/opt/smdr-insight"
 SERVICE_USER=$USER
 if [ "$SERVICE_USER" == "root" ]; then
-    SERVICE_USER="elmer" # Fallback to common user if run as sudo but need a non-root user
+    SERVICE_USER="elmer" # Fallback to common user
 fi
 
 echo "--- SMDR Insight Installer ---"
@@ -30,25 +30,27 @@ fi
 echo "Setting up installation directory: $INSTALL_DIR"
 if [ -d "$INSTALL_DIR" ]; then
     echo "Updating existing installation..."
-    sudo chown -R $USER:$USER $INSTALL_DIR
     cd $INSTALL_DIR
-    git pull
+    sudo git pull || (sudo chown -R $USER:$USER $INSTALL_DIR && git pull)
 else
     sudo mkdir -p $INSTALL_DIR
-    sudo chown -R $USER:$USER $INSTALL_DIR
-    git clone $REPO_URL $INSTALL_DIR
-    cd $INSTALL_DIR
+    sudo git clone $REPO_URL $INSTALL_DIR
 fi
 
-# 4. Build Project
+# Ensure correct ownership before building
+sudo chown -R $SERVICE_USER:$SERVICE_USER $INSTALL_DIR
+cd $INSTALL_DIR
+
+# 4. Build Project (ONCE during installation)
 echo "Installing dependencies and building project..."
-npm install
-npm run build
-npm run rebuild:native
+sudo -u $SERVICE_USER npm install
+sudo -u $SERVICE_USER npm run build
+sudo -u $SERVICE_USER npm run rebuild:native
 
 # 5. Setup Systemd Service
 echo "Configuring systemd service..."
 SERVICE_FILE="/etc/systemd/system/smdr-insight.service"
+NPM_PATH=$(which npm)
 
 cat <<EOF | sudo tee $SERVICE_FILE
 [Unit]
@@ -59,10 +61,9 @@ After=network.target
 Type=simple
 User=$SERVICE_USER
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$(which npm) run serve:node
+ExecStart=$NPM_PATH run serve:node
 Restart=always
 Environment=NODE_ENV=production
-# No DISPLAY environment needed for pure Node mode
 
 [Install]
 WantedBy=multi-user.target
@@ -72,7 +73,7 @@ EOF
 echo "Starting SMDR Insight service..."
 sudo systemctl daemon-reload
 sudo systemctl enable smdr-insight
-sudo systemctl restart smdr-insight # Use restart to ensure fresh start
+sudo systemctl restart smdr-insight
 
 echo "--------------------------------------------------"
 echo "SMDR Insight installed successfully!"
