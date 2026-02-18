@@ -34,6 +34,12 @@ export default function App() {
   const refreshDashboard = useAppStore((state) => state.refreshDashboard);
   const refreshAnalytics = useAppStore((state) => state.refreshAnalytics);
   const refreshRecords = useAppStore((state) => state.refreshRecords);
+  const initialize = useAppStore((state) => state.initialize);
+  const initialized = useAppStore((state) => state.initialized);
+
+  useEffect(() => {
+    void initialize();
+  }, [initialize]);
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -65,6 +71,19 @@ export default function App() {
     if (activePage === 'alerts') return <AlertsPage />;
     return <SettingsPage />;
   }, [activePage]);
+
+  if (!initialized) {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <div className="text-center">
+          <img src={logo} alt="Logo" className="mx-auto mb-4 h-24 w-auto animate-pulse rounded-2xl" />
+          <p className="text-xl font-bold italic animate-pulse" style={{ color: 'var(--text)' }}>
+            Initializing...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
