@@ -48,15 +48,20 @@ export function registerIpc(
     return true;
   });
 
-  ipcMain.handle('config:get', () => service.getConfig());
+  ipcMain.handle('config:get', () => {
+    console.log('[Main] IPC config:get called');
+    return service.getConfig();
+  });
 
   ipcMain.handle('config:update', (_, config: AppConfig) => {
+    console.log('[Main] IPC config:update called');
     service.updateConfig(config);
     configStore.set('config', config);
     return true;
   });
 
   ipcMain.handle('alerts:update-rules', (_, rules: AlertRuleSet) => {
+    console.log('[Main] IPC alerts:update-rules called');
     service.updateAlertRules(rules);
     const current = service.getConfig();
     configStore.set('config', current);
@@ -64,33 +69,53 @@ export function registerIpc(
   });
 
   ipcMain.handle('stream:start', () => {
+    console.log('[Main] IPC stream:start called');
     service.start();
     return true;
   });
 
   ipcMain.handle('stream:stop', () => {
+    console.log('[Main] IPC stream:stop called');
     service.stop();
     return true;
   });
 
-  ipcMain.handle('state:get', () => service.getState());
+  ipcMain.handle('state:get', () => {
+    console.log('[Main] IPC state:get called');
+    return service.getState();
+  });
 
   ipcMain.handle('records:list', (_, filters: RecordFilters) => {
+    console.log('[Main] IPC records:list called');
     return service.getRecords(filters ?? {});
   });
 
-  ipcMain.handle('records:recent', () => service.getRecentRecords());
+  ipcMain.handle('records:recent', () => {
+    console.log('[Main] IPC records:recent called');
+    return service.getRecentRecords();
+  });
 
-  ipcMain.handle('dashboard:get', (_, date?: string) => service.getDashboard(date));
+  ipcMain.handle('dashboard:get', (_, date?: string) => {
+    console.log('[Main] IPC dashboard:get called');
+    return service.getDashboard(date);
+  });
 
   ipcMain.handle('analytics:get', (_, startDate?: string, endDate?: string): AnalyticsSnapshot => {
+    console.log('[Main] IPC analytics:get called');
     return service.getAnalytics(startDate, endDate);
   });
 
-  ipcMain.handle('alerts:list', (_, limit?: number) => service.getAlerts(limit));
-  ipcMain.handle('parse-errors:list', (_, limit?: number) => service.getParseErrors(limit));
+  ipcMain.handle('alerts:list', (_, limit?: number) => {
+    console.log('[Main] IPC alerts:list called');
+    return service.getAlerts(limit);
+  });
+  ipcMain.handle('parse-errors:list', (_, limit?: number) => {
+    console.log('[Main] IPC parse-errors:list called');
+    return service.getParseErrors(limit);
+  });
 
   ipcMain.handle('records:export', (_, options: ExportOptions) => {
+    console.log('[Main] IPC records:export called');
     return service.exportRecords(options);
   });
 

@@ -1,34 +1,80 @@
 #!/bin/bash
 
-# SMDR Insight - Installation Script
-# This script downloads and installs the latest version of SMDR Insight from GitHub.
+# SMDR Insight - Build-from-Source Installer
+# This script clones the repo, builds the project, and sets up a systemd service.
 
 set -e
 
-REPO="gabaelmer/Project-SMDR"
-LATEST_RELEASE_URL="https://api.github.com/repos/$REPO/releases/latest"
-
-echo "Checking for the latest release of SMDR Insight..."
-
-# Get the latest deb package URL
-DEB_URL=$(curl -s $LATEST_RELEASE_URL | grep "browser_download_url.*deb" | cut -d '"' -f 4 | head -n 1)
-
-if [ -z "$DEB_URL" ]; then
-    echo "Error: Could not find a .deb package in the latest release."
-    exit 1
+REPO_URL="https://github.com/gabaelmer/Project-SMDR.git"
+INSTALL_DIR="/opt/smdr-insight"
+SERVICE_USER=$USER
+if [ "$SERVICE_USER" == "root" ]; then
+    SERVICE_USER="elmer" # Fallback to common user if run as sudo but need a non-root user
 fi
 
-PACKAGE_NAME=$(basename "$DEB_URL")
-TMP_DEB="/tmp/$PACKAGE_NAME"
+echo "--- SMDR Insight Installer ---"
 
-echo "Downloading $PACKAGE_NAME..."
-curl -L -o "$TMP_DEB" "$DEB_URL"
+# 1. Install System Dependencies
+echo "Installing system dependencies..."
+sudo apt-get update
+sudo apt-get install -y git build-essential curl
 
-echo "Installing SMDR Insight..."
-sudo dpkg -i "$TMP_DEB" || sudo apt-get install -f -y
+# 2. Install Node.js if not present
+if ! command -v node &> /dev/null; then
+    echo "Node.js not found. Installing Node.js 20.x..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+fi
 
-echo "SMDR Insight has been installed successfully!"
-echo "You can launch it from your application menu or by running 'smdr-insight'."
+# 3. Setup Install Directory
+echo "Setting up installation directory: $INSTALL_DIR"
+if [ -d "$INSTALL_DIR" ]; then
+    echo "Updating existing installation..."
+    sudo chown -R $USER:$USER $INSTALL_DIR
+    cd $INSTALL_DIR
+    git pull
+else
+    sudo mkdir -p $INSTALL_DIR
+    sudo chown -R $USER:$USER $INSTALL_DIR
+    git clone $REPO_URL $INSTALL_DIR
+    cd $INSTALL_DIR
+fi
 
-# Clean up
-rm "$TMP_DEB"
+# 4. Build Project
+echo "Installing dependencies and building project..."
+npm install
+npm run build
+npm run rebuild:native
+
+# 5. Setup Systemd Service
+echo "Configuring systemd service..."
+SERVICE_FILE="/etc/systemd/system/smdr-insight.service"
+
+cat <<EOF | sudo tee $SERVICE_FILE
+[Unit]
+Description=SMDR Insight Logger Service
+After=network.target
+
+[Service]
+Type=simple
+User=$SERVICE_USER
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$(which npm) run serve:headless
+Restart=always
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 6. Start Service
+echo "Starting SMDR Insight service..."
+sudo systemctl daemon-reload
+sudo systemctl enable smdr-insight
+sudo systemctl start smdr-insight
+
+echo "--------------------------------------------------"
+echo "SMDR Insight installed successfully!"
+echo "Service status: $(sudo systemctl is-active smdr-insight)"
+echo "Web Interface: http://localhost:3000"
+echo "--------------------------------------------------"

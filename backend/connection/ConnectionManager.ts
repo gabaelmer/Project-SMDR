@@ -100,13 +100,20 @@ export class ConnectionManager extends EventEmitter {
       return;
     }
 
+    if (this.socket) {
+      this.log('info', `Socket already exists, destroying old one before reconnecting to ${ip}`);
+      this.socket.removeAllListeners();
+      this.socket.destroy();
+      this.socket = null;
+    }
+
     this.setStatus('retrying');
     this.log('info', `Connecting to MiVB ${ip}:${this.config.port}`);
 
     const socket = new net.Socket();
     socket.setNoDelay(true);
     socket.setKeepAlive(true, 10_000);
-    socket.setTimeout(3000);
+    socket.setTimeout(15000); // Increased from 3s for better stability
 
     socket.connect(this.config.port, ip);
 
@@ -116,6 +123,11 @@ export class ConnectionManager extends EventEmitter {
       this.pendingRecordLine = null;
       this.clearPendingRecordTimer();
       this.setStatus('connected');
+
+      // Disable idle timeout once connected to support systems with low call volume.
+      // We rely on TCP KeepAlive (set above) for dead-peer detection.
+      socket.setTimeout(0);
+
       this.log('info', `Connected to MiVB ${ip}:${this.config.port}`);
 
       if (this.activeControllerIndex !== 0 && this.config.autoReconnectPrimary) {
@@ -135,27 +147,30 @@ export class ConnectionManager extends EventEmitter {
     });
 
     socket.on('error', (error) => {
-      this.log('error', `Socket error on ${ip}: ${error.message}`);
+      this.log('error', `Socket error on ${ip}: ${error.message} (Status: ${this.status})`);
       socket.destroy();
     });
 
     socket.on('timeout', () => {
-      this.log('warn', `Connection timeout for ${ip}`);
+      this.log('warn', `Connection timeout for ${ip} (15s expired)`);
+      if (this.socket === socket) this.socket = null;
       socket.destroy();
     });
 
-    socket.on('close', () => {
+    socket.on('close', (hadError) => {
       this.flushPendingRecord();
       if (this.socket === socket) {
         this.socket = null;
       }
 
+      const statusBefore = this.status;
       if (this.stopped) {
         this.setStatus('disconnected');
+        this.log('info', `Socket closed normally for ${ip} (stopped)`);
         return;
       }
 
-      this.log('warn', `Connection closed for ${ip}`);
+      this.log('warn', `Socket closed for ${ip}. HadError: ${hadError}. Status was: ${statusBefore}`);
       this.rotateController();
       this.scheduleReconnect();
     });
@@ -170,17 +185,22 @@ export class ConnectionManager extends EventEmitter {
 
     this.clearReconnectTimer();
     this.setStatus('retrying');
+    const delay = this.config.reconnectDelayMs || 5000;
+    this.log('info', `Scheduling reconnect to ${this.getActiveController()} in ${delay}ms`);
     this.reconnectTimer = setTimeout(() => {
-      if (!this.stopped) this.connectCurrent();
-    }, this.config.reconnectDelayMs || 5000);
+      if (!this.stopped) {
+        this.log('info', `Reconnect timer fired for ${this.getActiveController()}`);
+        this.connectCurrent();
+      }
+    }, delay);
   }
 
   private schedulePrimaryProbe(): void {
     this.clearPrimaryProbe();
     this.primaryProbeTimer = setTimeout(() => {
-      if (this.stopped || this.activeControllerIndex === 0) return;
+      if (this.stopped || this.activeControllerIndex === 0 || this.status !== 'connected') return;
       this.probePrimaryAndFailback();
-    }, this.config.primaryRecheckDelayMs || 60_000);
+    }, this.config.primaryRecheckDelayMs || 120_000); // Increased default delay to 2m
   }
 
   private probePrimaryAndFailback(): void {
@@ -190,7 +210,7 @@ export class ConnectionManager extends EventEmitter {
     const probe = new net.Socket();
     let switched = false;
 
-    probe.setTimeout(3000);
+    probe.setTimeout(10000);
     probe.connect(this.config.port, primaryIp);
 
     probe.on('connect', () => {
@@ -200,11 +220,13 @@ export class ConnectionManager extends EventEmitter {
       this.failbackToPrimary();
     });
 
-    probe.on('error', () => {
+    probe.on('error', (err) => {
+      this.log('info', `Primary probe failed: ${err.message}`);
       probe.destroy();
     });
 
     probe.on('timeout', () => {
+      this.log('info', `Primary probe timed out`);
       probe.destroy();
     });
 

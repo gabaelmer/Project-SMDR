@@ -66,29 +66,6 @@ export default function App() {
     return <SettingsPage />;
   }, [activePage]);
 
-  const isDesktopBridgeAvailable = typeof window.smdrInsight?.login === 'function';
-
-  if (!isDesktopBridgeAvailable) {
-    return (
-      <div className="flex h-full items-center justify-center p-4">
-        <div className="card w-full max-w-xl p-6 text-center">
-          <img src={logo} alt="Logo" className="mx-auto mb-4 h-24 w-auto rounded-2xl" />
-          <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>
-            SMDR Insight
-          </p>
-          <p className="mt-2 text-sm" style={{ color: 'var(--muted)' }}>
-            This page is running in a regular browser without the Electron backend. Login and live SMDR features only work
-            in the desktop app.
-          </p>
-          <p className="mt-3 text-xs" style={{ color: 'var(--muted)' }}>
-            Use the app on the host machine via <code>npm run dev</code> (development) or install the packaged desktop
-            build on the target PC.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   if (!isAuthenticated) {
     return (
       <div className="flex h-full items-center justify-center p-4">

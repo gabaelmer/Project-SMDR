@@ -1,0 +1,177 @@
+import express from 'express';
+import cors from 'cors';
+import fs from 'node:fs';
+import path from 'node:path';
+import { SMDRService } from '../SMDRService';
+import { SMDRRecord } from '../../shared/types';
+
+export class WebServer {
+    private readonly app = express();
+    private readonly port = 3000;
+
+    constructor(private readonly service: SMDRService) {
+        this.app.use(cors());
+        this.app.use(express.json());
+
+        this.setupRoutes();
+        this.setupStatic();
+    }
+
+    start(): void {
+        this.app.listen(this.port, '0.0.0.0', () => {
+            console.log(`[Web] Server listening on http://0.0.0.0:${this.port}`);
+        });
+    }
+
+    private setupRoutes(): void {
+        // Auth
+        this.app.post('/api/auth/login', (req, res) => {
+            const { username, password } = req.body;
+            console.log(`[Web] API Login attempt: ${username}`);
+            const ok = this.service.verifyLogin({ username, password });
+            console.log(`[Web] API Login result for ${username}: ${ok}`);
+            if (ok) {
+                // Return a simple mock token for session persistence
+                res.json({ success: true, token: `mock-token-${username}-${Date.now()}` });
+            } else {
+                res.json({ success: false });
+            }
+        });
+
+        this.app.get('/api/auth/verify', (req, res) => {
+            const authHeader = req.headers.authorization;
+            if (authHeader?.startsWith('Bearer mock-token-')) {
+                res.json({ success: true });
+            } else {
+                res.status(401).json({ success: false });
+            }
+        });
+
+        // Config & State
+        this.app.get('/api/config', (req, res) => {
+            res.json(this.service.getConfig());
+        });
+
+        this.app.get('/api/state', (req, res) => {
+            res.json(this.service.getState());
+        });
+
+        // Data
+        this.app.get('/api/dashboard', (req, res) => {
+            const { date } = req.query;
+            res.json(this.service.getDashboard(date as string));
+        });
+
+        this.app.get('/api/records', (req, res) => {
+            const filters = req.query as any;
+            res.json(this.service.getRecords(filters));
+        });
+
+        this.app.get('/api/analytics', (req, res) => {
+            const { startDate, endDate } = req.query;
+            res.json(this.service.getAnalytics(startDate as string, endDate as string));
+        });
+
+        this.app.get('/api/alerts', (req, res) => {
+            const { limit } = req.query;
+            res.json(this.service.getAlerts(Number(limit) || 100));
+        });
+
+        this.app.get('/api/parse-errors', (req, res) => {
+            const { limit } = req.query;
+            res.json(this.service.getParseErrors(Number(limit) || 100));
+        });
+
+        // Stream control
+        this.app.post('/api/stream/start', (req, res) => {
+            this.service.start();
+            res.json({ success: true });
+        });
+
+        this.app.post('/api/stream/stop', (req, res) => {
+            this.service.stop();
+            res.json({ success: true });
+        });
+
+        // Real-time Events (SSE)
+        this.app.get('/api/events', (req, res) => {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders();
+
+            const handler = (event: any) => {
+                res.write(`data: ${JSON.stringify(event)}\n\n`);
+            };
+
+            this.service.on('event', handler);
+
+            req.on('close', () => {
+                this.service.off('event', handler);
+                res.end();
+            });
+        });
+
+        // Export
+        this.app.get('/api/records/export', (req, res) => {
+            const filters = req.query as any;
+            try {
+                const records = this.service.getRecords(filters);
+                const csv = this.toCsv(records);
+
+                res.setHeader('Content-Type', 'text/csv');
+                res.setHeader('Content-Disposition', `attachment; filename=smdr-export-${Date.now()}.csv`);
+                res.send(csv);
+            } catch (err: any) {
+                console.error('[Web] Export Error:', err);
+                res.status(500).json({ error: 'Export failed', details: err.message });
+            }
+        });
+    }
+
+    private setupStatic(): void {
+        const rendererPath = path.join(__dirname, '../../../renderer');
+        this.app.use(express.static(rendererPath));
+
+        // For SPA routing
+        this.app.get(/(.*)/, (req, res) => {
+            if (!req.path.startsWith('/api')) {
+                const indexFile = path.join(rendererPath, 'index.html');
+                if (fs.existsSync(indexFile)) {
+                    res.sendFile(indexFile);
+                } else {
+                    res.status(404).send('Renderer not found. Please run build or check paths.');
+                }
+            } else {
+                res.status(404).json({ error: 'API endpoint not found' });
+            }
+        });
+
+        // Global error handler
+        this.app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction): void => {
+            console.error('[Web] Server Error:', err);
+            res.status(500).json({ error: 'Internal Server Error', details: err.message });
+        });
+    }
+
+    private toCsv(records: SMDRRecord[]): string {
+        if (records.length === 0) return '';
+
+        // Use identical logic to DatabaseService for parity
+        const headers = Object.keys(records[0]) as Array<keyof SMDRRecord>;
+        const lines = [headers.join(',')];
+
+        for (const record of records) {
+            const row = headers.map((header) => {
+                const value = String(record[header] ?? '');
+                if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+                    return `"${value.replace(/"/g, '""')}"`;
+                }
+                return value;
+            });
+            lines.push(row.join(','));
+        }
+
+        return `${lines.join('\n')}\n`;
+    }
+}

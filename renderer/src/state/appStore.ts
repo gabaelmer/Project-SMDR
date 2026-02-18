@@ -9,6 +9,7 @@ import {
   RecordFilters,
   SMDRRecord
 } from '../../../shared/types';
+import { api } from '../lib/api';
 
 export type PageId = 'dashboard' | 'calls' | 'analytics' | 'settings' | 'alerts';
 
@@ -103,15 +104,29 @@ export const useAppStore = create<AppState>((set, get) => ({
   initialize: async () => {
     if (get().initialized) return;
 
+    api.log('info', 'Renderer initialize() starting');
+
+    // For browser mode, check if we have a valid session
+    if (!api.isElectron()) {
+      const isAuthed = await api.verifyAuth();
+      if (isAuthed) {
+        set({ isAuthenticated: true });
+      } else {
+        set({ initialized: true }); // No session, but we are initialized at login screen
+        return;
+      }
+    }
+
     const [config, state, records, dashboard, analytics, alerts, parseErrors] = await Promise.all([
-      window.smdrInsight.getConfig(),
-      window.smdrInsight.getState(),
-      window.smdrInsight.getRecords(get().filters),
-      window.smdrInsight.getDashboard(get().filters.date),
-      window.smdrInsight.getAnalytics(get().filters.date, get().filters.date),
-      window.smdrInsight.getAlerts(200),
-      window.smdrInsight.getParseErrors(200)
+      api.getConfig(),
+      api.getState(),
+      api.getRecords(get().filters),
+      api.getDashboard(get().filters.date),
+      api.getAnalytics(get().filters.date, get().filters.date),
+      api.getAlerts(200),
+      api.getParseErrors(200)
     ]);
+    api.log('info', 'Renderer initialize() data fetched');
 
     set({
       config,
@@ -128,10 +143,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     if (!unsubscribeEvents) {
-      unsubscribeEvents = window.smdrInsight.onServiceEvent((event) => {
+      unsubscribeEvents = api.onServiceEvent((event) => {
         if (event.type === 'status') {
-          set({ connectionStatus: String(event.payload) });
-          get().refreshDashboard(get().filters.date);
+          const newStatus = String(event.payload);
+          const oldStatus = get().connectionStatus;
+          set({ connectionStatus: newStatus });
+
+          // Only refresh on transition to connected to avoid loops
+          if (newStatus === 'connected' && oldStatus !== 'connected') {
+            get().refreshDashboard(get().filters.date);
+          }
         }
 
         if (event.type === 'record') {
@@ -196,12 +217,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   login: async (username, password) => {
-    const ok = await window.smdrInsight.login({ username, password });
+    const ok = await api.login({ username, password });
     if (ok) {
       set({ isAuthenticated: true });
       await get().initialize();
     }
     return ok;
+  },
+
+  logout: async () => {
+    await api.logout();
+    set({ isAuthenticated: false, activePage: 'dashboard' });
   },
 
   setActivePage: (page) => set({ activePage: page }),
@@ -218,7 +244,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshRecords: async () => {
     set({ recordsLoading: true });
     try {
-      const rows = await window.smdrInsight.getRecords(get().filters);
+      const rows = await api.getRecords(get().filters);
       set({ records: rows });
     } catch (error) {
       console.error('Records refresh failed', error);
@@ -229,28 +255,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   refreshDashboard: async (date) => {
-    const dashboard = await window.smdrInsight.getDashboard(date ?? get().filters.date);
+    const dashboard = await api.getDashboard(date ?? get().filters.date);
     set({ dashboard });
   },
 
   refreshAnalytics: async (startDate, endDate) => {
-    const analytics = await window.smdrInsight.getAnalytics(startDate ?? get().filters.date, endDate ?? get().filters.date);
+    const analytics = await api.getAnalytics(startDate ?? get().filters.date, endDate ?? get().filters.date);
     set({ analytics });
   },
 
   refreshAlerts: async () => {
-    const alerts = (await window.smdrInsight.getAlerts(200)) as AlertEvent[];
+    const alerts = (await api.getAlerts(200)) as AlertEvent[];
     set({ alerts });
   },
 
   refreshParseErrors: async () => {
-    const parseErrors = (await window.smdrInsight.getParseErrors(200)) as ParseError[];
+    const parseErrors = (await api.getParseErrors(200)) as ParseError[];
     set({ parseErrors });
   },
 
   saveConfig: async (config) => {
-    await window.smdrInsight.updateConfig(config);
-    const state = await window.smdrInsight.getState();
+    await api.updateConfig(config);
+    const state = await api.getState();
     set({
       config,
       statusText: 'Configuration saved',
@@ -261,7 +287,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   updateAlertRules: async (rules) => {
-    await window.smdrInsight.updateAlertRules(rules);
+    await api.updateAlertRules(rules);
     set((state) => ({
       config: state.config ? { ...state.config, alerts: rules } : state.config,
       statusText: 'Alert rules saved'
@@ -269,19 +295,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   startStream: async () => {
-    await window.smdrInsight.startStream();
+    await api.startStream();
     set({ statusText: 'Stream started' });
     await get().refreshDashboard(get().filters.date);
   },
 
   stopStream: async () => {
-    await window.smdrInsight.stopStream();
+    await api.stopStream();
     set({ statusText: 'Stream stopped' });
     await get().refreshDashboard(get().filters.date);
   },
 
   exportRecords: async (format) => {
-    const savedPath = await window.smdrInsight.exportRecordsWithDialog({
+    const savedPath = await api.exportRecordsWithDialog({
       format,
       filters: get().filters
     });
@@ -294,7 +320,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   purgeRecords: async (days) => {
-    const removed = await window.smdrInsight.purgeRecords(days);
+    const removed = await api.purgeRecords(days);
     set({ statusText: `Purged ${removed} records older than ${days} days` });
     return removed;
   }

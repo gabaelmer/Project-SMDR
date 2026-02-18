@@ -7,6 +7,7 @@ import { AppConfig } from '../shared/types';
 import { buildDefaultConfig } from './defaultConfig';
 import { registerIpc } from './ipc';
 import { ConfigStore } from './configStore';
+import { WebServer } from '../backend/web/WebServer';
 
 console.log('[Main] Application starting...');
 let mainWindow: BrowserWindow | null = null;
@@ -52,6 +53,8 @@ function createWindow(): BrowserWindow {
   win.on('hide', () => console.log('[Main] Window hidden'));
   win.on('close', (e) => {
     console.log('[Main] Window close event triggered');
+    console.trace('Window Close Stack Trace');
+    // e.preventDefault(); // Uncomment this if we want to force it to stay open
   });
 
   win.on('closed', () => {
@@ -99,11 +102,21 @@ app.whenReady().then(() => {
 
     service = new SMDRService(mergedConfig);
     console.log('[Main] SMDRService created');
-    mainWindow = createWindow();
-    console.log('[Main] MainWindow created');
+
+    const isHeadless = process.argv.includes('--headless');
+    if (isHeadless) {
+      console.log('[Main] Running in HEADLESS mode');
+    } else {
+      mainWindow = createWindow();
+      console.log('[Main] MainWindow created');
+    }
 
     registerIpc(() => mainWindow, service, configStore);
     console.log('[Main] IPC registered and SMDR Service ready');
+
+    const webServer = new WebServer(service);
+    webServer.start();
+    console.log('[Main] Web Server started');
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
