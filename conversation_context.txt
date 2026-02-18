@@ -13,17 +13,17 @@ This document summarizes the core development milestones and technical decisions
 
 ## 3. Server-Optimized Deployment
 - **Headless Mode**: Pivoted from an Electron-based background service to a **pure Node.js engine** (`node-server.ts`). This eliminated dependencies on graphical displays (X Server) and significantly reduced resource overhead on servers.
-- **Building from Source**: Developed a high-stability `install.sh` that clones, builds, and configures the app natively on the host machine. This ensures binary compatibility for native modules like `better-sqlite3`.
+- **Universal Installer (v1.3)**: Developed a high-stability, user-agnostic `install.sh`. It dynamically detects the invoking user (via `$SUDO_USER`) or supports direct `root` installation, ensuring correct `chown` permissions and systemd service context on any Debian/Ubuntu machine.
 - **Systemd Integration**: Configured the app as a managed service (`smdr-insight.service`) for automatic boot-start and crash recovery.
 
 ## 4. Web Interface & Remote Access
 - **Network Access**: Built an Express-based Web Server into the application to provide a real-time dashboard accessible over the network (Port 3000).
-- **Session Persistence**: Implemented a token-based authentication system with browser-side persistence to prevent accidental logouts on page refresh.
-- **Config Persistence**: Added API routes and a file-backed persistence mechanism (`settings.json`) so that changes made in the web UI (like Mitel IP addresses) are remembered permanently.
+- **Session Persistence**: Implemented a token-based authentication system. Added an automated initialization hook in `App.tsx` that verifies existing tokens on page load, preventing accidental redirects to the login screen on browser refresh.
+- **Config Persistence**: Added API routes and a file-backed persistence mechanism (`settings.json`) so that changes made in the web UI (like Mitel IP addresses) are remembered permanently across service restarts.
 
 ## 5. Performance & Features
 - **Functional Parity**: Gained 100% parity between the desktop and web interfaces, including real-time SSE event streaming and robust CSV exports.
-- **Native Rebuilds**: Integrated automated native module rebuilding into the installer to guarantee performance for the SQLite database engine on production Debian/Ubuntu systems.
+- **Native Node Rebuilds**: Integrated automated `npm rebuild better-sqlite3` logic into the installer to guarantee binary compatibility with the server's specific Node.js version, resolving hidden startup crashes.
 
 ---
-*Context generated on 2026-02-18 for the SMDR Insight project.*
+*Context finalized on 2026-02-18 for the SMDR Insight project.*
